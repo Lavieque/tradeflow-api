@@ -26,12 +26,16 @@ export class ImportWorker {
     if (this.processing) return;
     if (this.browser.availablePages() === 0) return;
 
-    const job = await this.firebase.getNextPendingJob();
-    if (!job) return;
-
+    // Erros do Firestore (ex: ACCESS_TOKEN_EXPIRED) não podem derrubar o processo
     this.processing = true;
-    await this.processJob(job.id);
-    this.processing = false;
+    try {
+      const job = await this.firebase.getNextPendingJob();
+      if (job) await this.processJob(job.id);
+    } catch (err: any) {
+      this.logger.error(`Worker tick falhou: ${err.message}`);
+    } finally {
+      this.processing = false;
+    }
   }
 
   private async processJob(jobId: string) {
