@@ -304,7 +304,7 @@ export class StripeService implements OnModuleInit {
 
     this.logger.log(`Invoice paid — account: ${accountId}, plano: ${cfg.plano_id}, créditos: ${cfg.creditos}`);
 
-    const periodEnd = (subscription as any).current_period_end as number;
+    const periodEnd = this.getPeriodEnd(subscription);
 
     await this.firebase.updateAccount(accountId, {
       plano_id: cfg.plano_id as any,
@@ -317,6 +317,13 @@ export class StripeService implements OnModuleInit {
       stripe_customer_id: subscription.customer as string,
       renovacao_em: admin.firestore.Timestamp.fromMillis(periodEnd * 1000),
     });
+  }
+
+  // API Stripe recente move current_period_end para os items da subscrição
+  private getPeriodEnd(subscription: Stripe.Subscription): number {
+    const end = (subscription as any).current_period_end
+      ?? (subscription.items.data[0] as any)?.current_period_end;
+    return Number.isInteger(end) ? end : Math.floor(Date.now() / 1000) + 30 * 24 * 60 * 60;
   }
 
   // Upgrade/downgrade de plano via portal
@@ -333,7 +340,7 @@ export class StripeService implements OnModuleInit {
 
     this.logger.log(`Subscription updated — account: ${accountId}, plano: ${cfg.plano_id}`);
 
-    const periodEnd = (subscription as any).current_period_end as number;
+    const periodEnd = this.getPeriodEnd(subscription);
     const account = await this.firebase.getAccount(accountId);
     await this.firebase.updateAccount(accountId, {
       plano_id: cfg.plano_id as any,
