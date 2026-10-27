@@ -3,7 +3,7 @@ version: '3.8'
 services:
   tradeflow-api:
     build:
-      context: https://github.com/Virgilio-24/tradeflow.git#main
+      context: https://github.com/Lavieque/tradeflow-api.git#main
     image: tradeflow-api
     container_name: tradeflow-api
     restart: always

@@ -2,14 +2,12 @@ import { NestFactory } from '@nestjs/core';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
-import { join } from 'path';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     rawBody: true, // necessário para validar assinatura do webhook Stripe
   });
-  app.useStaticAssets(join(__dirname, '..', 'public'));
   const logger = new Logger('TradeFlow');
 
   app.enableCors({
