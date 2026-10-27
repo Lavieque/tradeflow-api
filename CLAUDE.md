@@ -22,7 +22,7 @@ TradeFlow é um serviço SaaS **completamente independente** de scraping de prod
 | Browser automation | Playwright (pool de páginas) |
 | Base de dados | Firebase Firestore (projecto novo, separado do Real Stiles) |
 | Imagens | Cloudinary (do cliente, não do TradeFlow) |
-| Deploy | Render.com (Docker) |
+| Deploy | Docker no servidor próprio + Cloudflare Tunnel (`api.tradeflow.pt`) |
 
 **Sem Redis, sem PostgreSQL, sem BullMQ** — a fila de jobs usa Firebase Firestore directamente (worker faz poll a cada 3s).
 
@@ -32,36 +32,28 @@ TradeFlow é um serviço SaaS **completamente independente** de scraping de prod
 
 ```
 src/
-├── main.ts                              # entrada NestJS, porta 3000
-├── app.module.ts                        # módulo raiz
-├── common/types/index.ts                # todos os tipos TypeScript
-│
-├── firebase/
-│   ├── firebase.module.ts               # módulo global
-│   └── firebase.service.ts             # todas as operações Firestore
-│
-├── browser/
-│   ├── browser.module.ts               # módulo global
-│   └── browser.service.ts             # pool de páginas Playwright (stealth)
-│
+├── main.ts                       # entrada NestJS (helmet, CORS, rawBody p/ Stripe), PORT
+├── app.module.ts                 # módulo raiz
+├── common/types/index.ts         # tipos TypeScript
+├── firebase/                     # FirebaseService — todas as operações Firestore
+├── browser/                      # BrowserService — pool de páginas Playwright (stealth)
+├── mail/                         # MailService — emails via Gmail (nodemailer)
 ├── extractors/
-│   ├── base/extractor.interface.ts     # interface: canHandle + extract
-│   ├── shein/shein.extractor.ts        # Shein — intercepta /api/productInfo/v3/
-│   └── factory/extractor.factory.ts   # escolhe extractor pelo URL
-│
-├── workers/
-│   └── import.worker.ts               # @Cron a cada 3s, processa jobs pending
-│
+│   ├── base/extractor.interface.ts   # interface: canHandle + extract
+│   ├── factory/extractor.factory.ts  # escolhe extractor pelo URL
+│   ├── shein/                        # Shein (sidecar + fallback browser)
+│   ├── sidecar/                      # marketplaces servidos pelo scraping-sidecar
+│   └── claude/                       # extracção assistida por Claude
+├── workers/import.worker.ts      # @Cron 3s, processa jobs pending
 └── modules/
-    ├── auth/auth.guard.ts             # LicenseGuard: valida key+store+créditos
-    ├── scrape/
-    │   ├── scrape.controller.ts       # POST /scrape, GET /job/:id, GET /usage
-    │   ├── scrape.service.ts          # lógica de criação de jobs
-    │   └── scrape.module.ts
-    └── admin/
-        ├── admin.controller.ts        # todos os endpoints /admin/*
-        ├── admin.service.ts           # lógica de gestão
-        └── admin.module.ts
+    ├── auth/auth.guard.ts        # LicenseGuard: key + store + créditos
+    ├── scrape/                   # POST /scrape, GET /job/:id, /usage, /plans
+    ├── admin/                    # /admin/* (x-admin-token)
+    ├── registar/                 # /registar — registo público (landing)
+    ├── stripe/                   # /stripe/* checkout, portal, cancel, webhook
+    ├── billing/                  # cron de trials/renovações
+    └── cookies/                  # /cookies — sessões/cookies p/ o sidecar
+scripts/seed-plans.ts             # cria planos iniciais no Firestore
 ```
 
 ---
@@ -143,14 +135,13 @@ PORT=3000
 
 ---
 
-## Deploy (Render.com)
+## Deploy
 
-- Runtime: Docker (usa `Dockerfile` na raiz)
-- O Dockerfile instala Chromium no container
-- `render.yaml` tem a configuração completa
-- Plano free do Render é suficiente para baixo volume
-
----
+- Este repo é **só a API**. Admin (`tradeflow-admin`) e landing (`tradeflow-landing`) vivem em repos próprios e consomem esta API por HTTP.
+- Runtime: Docker (`Dockerfile` na raiz, instala Chromium). `docker-compose.yml` constrói a partir do GitHub e lê o `.env` do servidor.
+- Exposição pública: Cloudflare Tunnel → `api.tradeflow.pt` → `localhost:3004`.
+- O sidecar (scraping + noVNC) é um serviço interno separado, acedido por `SIDECAR_URL`.
+- Webhook Stripe: `https://api.tradeflow.pt/stripe/webhook`.
 
 ## Extractors — princípio fundamental
 
@@ -197,7 +188,7 @@ Planos sugeridos: `trial`, `starter`, `pro`, `business`
 ## Relação com Real Stiles
 
 - Real Stiles (`c:\Users\virgilio.jose\source\repos\realstiles`) é o primeiro cliente
-- Usa a API do TradeFlow em `admin/importar.html`
+- Usa a API do TradeFlow em `admin/importar.html` (passar a `https://api.tradeflow.pt`)
 - Tem a sua própria license key e store registada
 - Os produtos são guardados no Firebase do Real Stiles (projecto diferente)
 - O TradeFlow apenas extrai e devolve dados — não guarda produtos
@@ -216,10 +207,9 @@ Planos sugeridos: `trial`, `starter`, `pro`, `business`
 - [x] ScrapeModule (POST /scrape, GET /job/:id, GET /usage)
 - [x] AdminModule (gestão completa de contas, planos, logs)
 - [x] Dockerfile com Chromium
-- [x] render.yaml
 - [ ] npm install + build testado
 - [ ] Firebase projecto criado e configurado
-- [ ] Deploy no Render
+- [ ] Deploy atrás do Cloudflare Tunnel (api.tradeflow.pt)
 - [ ] Integração com Real Stiles (admin/importar.html)
 - [ ] Planos iniciais criados no Firebase
 - [ ] Primeira conta (Real Stiles) criada
@@ -231,7 +221,7 @@ Planos sugeridos: `trial`, `starter`, `pro`, `business`
 3. Extrair `project_id`, `client_email`, `private_key` para o `.env`
 4. `npm install` na pasta tradeflow
 5. `npm run start:dev` para testar localmente
-6. Deploy no Render (ligar repositório GitHub)
+6. Deploy via Docker + Cloudflare Tunnel
 7. Criar planos iniciais via `PUT /admin/plans/trial` etc.
 8. Criar conta Real Stiles via `POST /admin/accounts`
 9. Integrar `admin/importar.html` do Real Stiles com a nova API

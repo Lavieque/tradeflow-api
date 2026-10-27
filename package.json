@@ -1,13 +1,14 @@
 {
-  "name": "tradeflow",
+  "name": "tradeflow-api",
   "version": "1.0.0",
-  "description": "TradeFlow — SaaS product scraping service",
+  "description": "TradeFlow API — SaaS product scraping service",
   "main": "dist/main.js",
   "scripts": {
     "build": "nest build",
     "start": "node dist/main.js",
     "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch"
+    "start:debug": "nest start --debug --watch",
+    "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.106.0",
