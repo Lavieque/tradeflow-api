@@ -122,3 +122,13 @@ export interface ProductData {
   fonte_site: MarketplaceSource;
   colorImagesMap?: Record<string, string[]>;
 }
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  nome?: string | null;
+  password_hash: string; // scrypt$<salt>$<hash> (hex)
+  activo: boolean;
+  ultimo_login?: unknown;
+  criado_em?: unknown;
+}

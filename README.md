@@ -31,7 +31,9 @@ Expor com Cloudflare Tunnel: `api.tradeflow.pt` → `http://localhost:3004`.
 |---|---|
 | `POST /scrape`, `GET /job/:id`, `GET /usage` | `x-license-key` + `x-store-url` |
 | `GET /plans`, `POST /registar` | públicas |
-| `/admin/*` | `x-admin-token` (`ADMIN_SECRET`) |
+| `/admin/auth/login` | público (email + password, rate-limited) → JWT |
+| `/admin/users` (GET, POST, PUT :id/password, PUT :id/active) | gestão de admins; 1.º admin via `x-admin-token` |
+| `/admin/*` | painel: `Authorization: Bearer <JWT>` (`JWT_SECRET`); outros clientes: `x-admin-token` (`ADMIN_SECRET`); admins na colecção `admin_users` (`scripts/create-admin.ts`) |
 | `POST /stripe/webhook` | assinatura Stripe (`STRIPE_WEBHOOK_SECRET`) |
 
 Detalhes de arquitetura, créditos e planos em [CLAUDE.md](CLAUDE.md).

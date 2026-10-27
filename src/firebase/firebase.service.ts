@@ -3,7 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import * as admin from 'firebase-admin';
 import {
   Account, Store, Plan, Job, Log, JobStatus,
-  LogLevel, ProductData, JobType, JOB_COST,
+  LogLevel, ProductData, JobType, JOB_COST, AdminUser,
 } from '../common/types';
 
 @Injectable()
@@ -27,6 +27,38 @@ export class FirebaseService implements OnModuleInit {
     }
     this.db = admin.firestore();
     this.logger.log('Firebase connected');
+  }
+
+  // ── ADMIN USERS ──
+
+  async getAdminUserByEmail(email: string): Promise<AdminUser | null> {
+    const snap = await this.db.collection('admin_users')
+      .where('email', '==', email).limit(1).get();
+    if (snap.empty) return null;
+    const d = snap.docs[0];
+    return { id: d.id, ...d.data() } as AdminUser;
+  }
+
+  async listAdminUsers(): Promise<AdminUser[]> {
+    const snap = await this.db.collection('admin_users').orderBy('email').get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as AdminUser);
+  }
+
+  async getAdminUser(id: string): Promise<AdminUser | null> {
+    const d = await this.db.collection('admin_users').doc(id).get();
+    return d.exists ? ({ id: d.id, ...d.data() } as AdminUser) : null;
+  }
+
+  async createAdminUser(data: Omit<AdminUser, 'id'>): Promise<string> {
+    const ref = await this.db.collection('admin_users').add({
+      ...data,
+      criado_em: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    return ref.id;
+  }
+
+  async updateAdminUser(id: string, data: Partial<AdminUser>): Promise<void> {
+    await this.db.collection('admin_users').doc(id).update(data);
   }
 
   // ── ACCOUNTS ──
